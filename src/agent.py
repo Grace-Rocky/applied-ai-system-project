@@ -136,7 +136,14 @@ class RecommendationAgent:
                        if str(s.get("mood", "")).lower() == mood_pref]
         
         # Step 3: Combine and deduplicate
-        candidates = list(set(genre_matches + mood_matches))
+        # Step 3: Combine and deduplicate by song ID
+        seen_ids = set()
+        candidates = []
+        for song in genre_matches + mood_matches:
+            song_id = song.get("id")
+            if song_id not in seen_ids:
+                candidates.append(song)
+                seen_ids.add(song_id)
         
         if not candidates:
             candidates = all_songs[:10]  # Fallback to first 10 if no matches
