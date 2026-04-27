@@ -1,13 +1,9 @@
-"""
-RAG (Retrieval-Augmented Generation) Module for Music Recommender.
-
-This module implements retrieval-augmented generation to enrich recommendations
-with contextual metadata about songs. It retrieves relevant song descriptions,
-artist information, and thematic tags to provide more informed recommendations.
-"""
+"""RAG module for metadata retrieval and evidence-backed explanations."""
 
 from typing import List, Dict, Tuple, Optional
 import logging
+import re
+from collections import Counter
 
 logger = logging.getLogger(__name__)
 
@@ -151,9 +147,55 @@ class RAGRetriever:
     """
     
     def __init__(self, metadata: Dict[int, Dict] = None):
-        """Initialize the RAG retriever with song metadata."""
+        """Initialize retriever with seed metadata; supports dynamic hydration."""
         self.metadata = metadata or SONG_METADATA
         logger.info(f"RAG Retriever initialized with {len(self.metadata)} songs")
+
+    @staticmethod
+    def _tokenize(text: str) -> List[str]:
+        return re.findall(r"[a-z0-9]+", text.lower())
+
+    def _metadata_from_song(self, song: Dict) -> Dict:
+        """Generate fallback metadata for songs not in the curated seed set."""
+        genre = str(song.get("genre", "music")).lower()
+        mood = str(song.get("mood", "balanced")).lower()
+        title = str(song.get("title", "Unknown Track"))
+        artist = str(song.get("artist", "Unknown Artist"))
+        energy = float(song.get("energy", 0.5))
+        dance = float(song.get("danceability", 0.5))
+        acoustic = float(song.get("acousticness", 0.5))
+
+        intensity_tag = "high-energy" if energy >= 0.7 else "low-energy" if energy <= 0.35 else "mid-energy"
+        dance_tag = "dance-heavy" if dance >= 0.7 else "groove-light"
+        acoustic_tag = "acoustic-leaning" if acoustic >= 0.6 else "electronic-leaning"
+
+        return {
+            "title": title,
+            "description": (
+                f"{title} blends {genre} textures with a {mood} emotional profile, "
+                f"engineered for listeners who prefer {intensity_tag} tracks."
+            ),
+            "tags": [genre, mood, intensity_tag, dance_tag, acoustic_tag],
+            "audio_features": (
+                f"Energy {energy:.2f}, danceability {dance:.2f}, "
+                f"acousticness {acoustic:.2f}."
+            ),
+            "artist_style": f"{artist} - catalog-generated descriptor",
+            "source": "catalog-derived",
+        }
+
+    def hydrate_from_songs(self, songs: List[Dict]) -> None:
+        """Populate metadata entries for any song IDs missing curated metadata."""
+        added = 0
+        for song in songs:
+            song_id = int(song.get("id", 0) or 0)
+            if song_id <= 0:
+                continue
+            if song_id not in self.metadata:
+                self.metadata[song_id] = self._metadata_from_song(song)
+                added += 1
+        if added:
+            logger.info("RAG metadata hydrated with %s generated entries", added)
     
     def retrieve_song_context(self, song_id: int) -> Optional[Dict]:
         """
@@ -166,6 +208,43 @@ class RAGRetriever:
             Dictionary with metadata or None if not found
         """
         return self.metadata.get(song_id)
+
+    def semantic_search(self, query: str, limit: int = 5) -> List[Tuple[int, Dict, float]]:
+        """Simple lexical retrieval over metadata text with transparent scoring."""
+        query_tokens = self._tokenize(query)
+        if not query_tokens:
+            return []
+
+        query_counts = Counter(query_tokens)
+        query_norm = sum(v * v for v in query_counts.values()) ** 0.5
+        if query_norm == 0:
+            return []
+
+        matches: List[Tuple[int, Dict, float]] = []
+        for song_id, metadata in self.metadata.items():
+            corpus = " ".join(
+                [
+                    metadata.get("title", ""),
+                    metadata.get("description", ""),
+                    " ".join(metadata.get("tags", [])),
+                    metadata.get("audio_features", ""),
+                    metadata.get("artist_style", ""),
+                ]
+            )
+            doc_tokens = self._tokenize(corpus)
+            if not doc_tokens:
+                continue
+            doc_counts = Counter(doc_tokens)
+            dot = sum(query_counts[token] * doc_counts.get(token, 0) for token in query_counts)
+            if dot <= 0:
+                continue
+            doc_norm = sum(v * v for v in doc_counts.values()) ** 0.5
+            score = dot / (query_norm * doc_norm) if doc_norm else 0.0
+            if score > 0:
+                matches.append((song_id, metadata, score))
+
+        matches.sort(key=lambda item: item[2], reverse=True)
+        return matches[:limit]
     
     def retrieve_by_tags(self, target_tags: List[str], limit: int = 5) -> List[Tuple[int, Dict, int]]:
         """
@@ -246,7 +325,16 @@ class RAGRetriever:
             Enriched recommendation dictionary
         """
         song_id = int(song.get("id", 0))
-        metadata = self.retrieve_song_context(song_id)
+        metadata = self.retrieve_song_context(song_id) or self._metadata_from_song(song)
+
+        query = " ".join(
+            [
+                str(song.get("genre", "")),
+                str(song.get("mood", "")),
+                " ".join(reasons),
+            ]
+        )
+        evidence = self.semantic_search(query, limit=3)
         
         enriched = {
             "song": song,
@@ -260,6 +348,16 @@ class RAGRetriever:
             enriched["description"] = metadata.get("description", "")
             enriched["tags"] = metadata.get("tags", [])
             enriched["artist_style"] = metadata.get("artist_style", "")
+            enriched["rag_source"] = metadata.get("source", "curated")
+        enriched["rag_evidence"] = [
+            {
+                "song_id": ev_song_id,
+                "title": ev_meta.get("title", "unknown"),
+                "score": round(ev_score, 4),
+                "tags": ev_meta.get("tags", [])[:4],
+            }
+            for ev_song_id, ev_meta, ev_score in evidence
+        ]
         
         return enriched
     
@@ -278,9 +376,11 @@ class RAGRetriever:
         
         # Retrieve songs by tags that match mood
         mood_matches = self.retrieve_by_mood(mood, limit=3)
+        semantic_matches = self.semantic_search(f"{genre} {mood}", limit=3)
         
         context = {
             "mood_based_suggestions": mood_matches,
+            "semantic_matches": semantic_matches,
             "genre_search": genre,
             "mood_search": mood,
             "contextual_hints": []

@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PulseMetal Music Intelligence</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+</head>
+<body>
+  <div class="noise-layer"></div>
+  <div class="background-orb orb-a"></div>
+  <div class="background-orb orb-b"></div>
+  <div class="background-orb orb-c"></div>
+  <header class="hero glass">
+    <div class="hero-copy reveal">
+      <p class="eyebrow">AI Recommender System</p>
+      <h1>PulseMetal Music Intelligence</h1>
+      <p class="subtext">A cinematic recommendation console with agentic reasoning, evidence-backed RAG retrieval, and reliability cross-checks that feel alive.</p>
+      <div class="hero-pills">
+        <span>338-track catalog</span>
+        <span>Fact-check scoring</span>
+        <span>Agent trace</span>
+        <span>Glassmorphism UI</span>
+      </div>
+    </div>
+    <div class="catalog-metrics reveal stagger">
+      <div class="metric"><span>Songs</span><strong>{{ catalog_stats.songs }}</strong></div>
+      <div class="metric"><span>Genres</span><strong>{{ catalog_stats.genres }}</strong></div>
+      <div class="metric"><span>Moods</span><strong>{{ catalog_stats.moods }}</strong></div>
+      <div class="metric"><span>Artists</span><strong>{{ catalog_stats.artists }}</strong></div>
+    </div>
+  </header>
+
+  <section class="showcase-grid">
+    <article class="panel glass reveal">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">Catalog Pulse</p>
+          <h2>Live distribution at a glance</h2>
+        </div>
+        <div class="mini-note">Updated from the full catalog</div>
+      </div>
+      <div class="chart-wrap chart-large"><canvas id="catalogChart"></canvas></div>
+    </article>
+
+    <article class="panel glass reveal delay-1">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">Featured Tracks</p>
+          <h2>High-signal selections</h2>
+        </div>
+        <div class="mini-note">Top-scoring vibe anchors</div>
+      </div>
+      <div id="featured-tracks" class="featured-stack"></div>
+    </article>
+  </section>
+
+  <main class="layout">
+    <section class="panel glass" id="recommend-panel">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">Recommendation Studio</p>
+          <h2>Build a music profile</h2>
+        </div>
+        <div class="mini-note">Animated cards, live explanations</div>
+      </div>
+      <div class="form-grid">
+        <label>Genre
+          <select id="genre">
+            {% for genre in genres %}
+            <option value="{{ genre }}">{{ genre }}</option>
+            {% endfor %}
+          </select>
+        </label>
+
+        <label>Mood
+          <select id="mood">
+            {% for mood in moods %}
+            <option value="{{ mood }}">{{ mood }}</option>
+            {% endfor %}
+          </select>
+        </label>
+
+        <label>Energy <span id="energy-value">0.80</span>
+          <input id="energy" type="range" min="0" max="1" step="0.01" value="0.8" />
+        </label>
+
+        <label>Valence <span id="valence-value">0.75</span>
+          <input id="valence" type="range" min="0" max="1" step="0.01" value="0.75" />
+        </label>
+
+        <label>Danceability <span id="danceability-value">0.80</span>
+          <input id="danceability" type="range" min="0" max="1" step="0.01" value="0.8" />
+        </label>
+
+        <label>Top Results
+          <input id="topk" type="number" min="3" max="20" value="8" />
+        </label>
+      </div>
+
+      <div class="toggles">
+        <label><input id="likes-acoustic" type="checkbox" /> Prefer Acoustic</label>
+        <label><input id="use-rag" type="checkbox" checked /> RAG Evidence</label>
+        <label><input id="use-agent" type="checkbox" checked /> Agent Workflow</label>
+      </div>
+
+      <button id="run-recommend" class="cta">Generate Recommendations</button>
+      <div id="recommend-status" class="status"></div>
+      <div id="recommend-results" class="cards"></div>
+      <details id="workflow-container" class="workflow">
+        <summary>Agent Workflow Trace</summary>
+        <div id="workflow-results"></div>
+      </details>
+    </section>
+
+    <section class="panel glass" id="evaluation-panel">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">Reliability Command Center</p>
+          <h2>Cross-check the machine</h2>
+        </div>
+        <div class="mini-note">Consistency, coverage, diversity, fact-checks</div>
+      </div>
+      <p class="subtext">Cross-verifies recommendation claims against song attributes and baseline ranking behavior.</p>
+      <button id="run-evaluation" class="cta secondary">Run Full Evaluation Suite</button>
+      <div id="evaluation-status" class="status"></div>
+      <div id="evaluation-summary" class="summary-grid"></div>
+      <div class="chart-wrap"><canvas id="evaluationChart"></canvas></div>
+      <div id="scenario-results" class="scenario-grid"></div>
+    </section>
+
+    <section class="panel glass" id="rag-panel">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">RAG Evidence Explorer</p>
+          <h2>Probe the memory layer</h2>
+        </div>
+        <div class="mini-note">Semantic retrieval with source-backed context</div>
+      </div>
+      <div class="form-grid compact">
+        <label>Semantic Query
+          <input id="rag-query" type="text" placeholder="e.g. energetic electronic dance" />
+        </label>
+        <label>Mood Query
+          <input id="rag-mood" type="text" placeholder="e.g. chill" />
+        </label>
+      </div>
+      <button id="run-rag" class="cta tertiary">Search RAG Context</button>
+      <div id="rag-status" class="status"></div>
+      <div class="chart-wrap chart-small"><canvas id="ragChart"></canvas></div>
+      <div id="rag-results" class="cards"></div>
+    </section>
+  </main>
+
+  <script>
+    window.APP_BOOTSTRAP = {
+      songCount: {{ catalog_stats.songs }},
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
