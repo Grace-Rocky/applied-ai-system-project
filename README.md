@@ -135,7 +135,3 @@ pytest tests/test_recommender.py -v
 - RAG uses curated metadata for seed songs and generated metadata for expanded catalog entries.
 - Fact-checking is rule-based and auditable.
 - The visual system is intentionally bold and mobile-responsive to feel like a real product.
-
-## Status
-
-Production-ready for demo and portfolio presentation.
