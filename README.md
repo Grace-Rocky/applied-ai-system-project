@@ -136,6 +136,8 @@ pytest tests/test_recommender.py -v
 - Fact-checking is rule-based and auditable.
 - The visual system is intentionally bold and mobile-responsive to feel like a real product.
 
-[![Watch the video](https://cdn.loom.com/sessions/thumbnails/415eaf21462b4f669b26a067b111d7be-with-play.gif)](https://www.loom.com/share/415eaf21462b4f669b26a067b111d7be)
 
+## 🎥 Presentation Video
 
+The presentation video is available here:  
+👉 https://www.loom.com/share/415eaf21462b4f669b26a067b111d7be
